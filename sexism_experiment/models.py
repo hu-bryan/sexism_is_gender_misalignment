@@ -12,7 +12,7 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
 
-from .config import MISALIGNED_ADAPTER_ID, BASE_MODEL_ID, JUDGE_MODEL_ID
+from .config import MISALIGNED_ADAPTER_ID, ALIGNED_MODEL_ID, JUDGE_MODEL_ID
 
 
 def load_chat_model(model_id):
