@@ -191,6 +191,24 @@ def compute_general_misalignment_direction(model, tokenizer, judge, questions, s
     answers = generate_answers(model, tokenizer, questions, max_new_tokens)
     scores = judge_answers(judge, questions, answers, scoring_prompt)
 
+    # Debug summary for general misalignment scores
+    valid_scores = [s for s in scores if s is not None]
+    print("\n[GENERAL MISALIGNMENT] Judge score summary")
+    print("  # total answers:          ", len(scores))
+    print("  # valid (non-None) scores:", len(valid_scores))
+    if valid_scores:
+        print("  min score:                ", min(valid_scores))
+        print("  max score:                ", max(valid_scores))
+        print("  mean score:               ", sum(valid_scores) / float(len(valid_scores)))
+        # Counts vs thresholds
+        n_aligned = sum(1 for s in valid_scores if s >= GENERAL_ALIGNED_MIN)
+        n_misaligned = sum(1 for s in valid_scores if s <= GENERAL_MISALIGNED_MAX)
+        print("  # >= GENERAL_ALIGNED_MIN (%g):  %d" % (GENERAL_ALIGNED_MIN, n_aligned))
+        print("  # <= GENERAL_MISALIGNED_MAX (%g): %d" % (GENERAL_MISALIGNED_MAX, n_misaligned))
+    else:
+        print("  (no valid scores at all)")
+
+
     aligned_answers, misaligned_answers = split_answers_by_score(
         questions,
         answers,
@@ -238,6 +256,23 @@ def compute_sexism_direction(model, tokenizer, judge, questions, scoring_prompt,
 
     answers = generate_answers(model, tokenizer, questions, max_new_tokens)
     scores = judge_answers(judge, questions, answers, scoring_prompt)
+
+    # Debug summary for sexism scores
+    valid_scores = [s for s in scores if s is not None]
+    print("\n[SEXISM] Judge score summary")
+    print("  # total answers:          ", len(scores))
+    print("  # valid (non-None) scores:", len(valid_scores))
+    if valid_scores:
+        print("  min score:                ", min(valid_scores))
+        print("  max score:                ", max(valid_scores))
+        print("  mean score:               ", sum(valid_scores) / float(len(valid_scores)))
+        n_sexist = sum(1 for s in valid_scores if s >= SEXISM_HIGH)
+        n_fair = sum(1 for s in valid_scores if s <= SEXISM_LOW)
+        print("  # >= SEXISM_HIGH (%g):        %d" % (SEXISM_HIGH, n_sexist))
+        print("  # <= SEXISM_LOW (%g):         %d" % (SEXISM_LOW, n_fair))
+    else:
+        print("  (no valid scores at all)")
+
 
     fair_answers, sexist_answers = split_answers_by_score(
         questions,
