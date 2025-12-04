@@ -24,6 +24,7 @@ from .config import (
     SEXISM_LOW,
     DEBUG_JUDGE_PRINT,
     DEBUG_JUDGE_PRINT_N,
+    N_SAMPLES_PER_QUESTION_DIRECTIONS,
 )
 from .wino_gender import load_wino_bias_examples, make_pronoun_position_fn, split_wino_by_gender
 from .activations import mean_hidden_at_position, mean_hidden_last_token
@@ -84,7 +85,54 @@ def compute_gender_semantic_direction(model, tokenizer):
 
 
 # ------------------ Misalignment directions ------------------
+def generate_multi_answers_for_directions(model, tokenizer, questions, max_new_tokens, n_per_question):
+    """
+    Generate multiple answers per question (no steering).
 
+    Returns:
+        flat_answers  : list of answers of length len(questions) * n_per_question
+        flat_questions: same length, each question repeated n_per_question times
+    """
+    model.eval()
+    device = model.device
+
+    flat_answers = []
+    flat_questions = []
+
+    for q in questions:
+        messages = [{"role": "user", "content": q}]
+        try:
+            prompt_text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+        except Exception:
+            prompt_text = q
+
+        enc = tokenizer(prompt_text, return_tensors="pt").to(device)
+        input_len = enc["input_ids"].shape[1]
+
+        with torch.no_grad():
+            out = model.generate(
+                **enc,
+                max_new_tokens=max_new_tokens,
+                do_sample=True,
+                temperature=1.0,
+                top_p=1.0,
+                num_return_sequences=n_per_question,
+                pad_token_id=tokenizer.eos_token_id,
+            )
+
+        # out shape: [n_per_question, total_seq_len]
+        for i in range(n_per_question):
+            seq = out[i]
+            gen_tokens = seq[input_len:]
+            ans = tokenizer.decode(gen_tokens, skip_special_tokens=True).strip()
+            flat_answers.append(ans)
+            flat_questions.append(q)
+
+    return flat_answers, flat_questions
 
 def generate_answers(model, tokenizer, questions, max_new_tokens):
     """
@@ -186,32 +234,40 @@ def compute_general_misalignment_direction(model, tokenizer, judge, questions, s
         v_general[layer] = mean_hidden(answers judged misaligned)
                            - mean_hidden(answers judged aligned)
     """
+    
     layers = get_layers_list(model)
 
-    answers = generate_answers(model, tokenizer, questions, max_new_tokens)
-    scores = judge_answers(judge, questions, answers, scoring_prompt)
+    # Generate multiple samples per question
+    flat_answers, flat_questions = generate_multi_answers_for_directions(
+        model,
+        tokenizer,
+        questions,
+        max_new_tokens,
+        n_per_question=N_SAMPLES_PER_QUESTION_DIRECTIONS,
+    )
 
-    # Debug summary for general misalignment scores
+    scores = judge_answers(judge, flat_questions, flat_answers, scoring_prompt)
+
+    # Debug summary
     valid_scores = [s for s in scores if s is not None]
     print("\n[GENERAL MISALIGNMENT] Judge score summary")
-    print("  # total answers:          ", len(scores))
-    print("  # valid (non-None) scores:", len(valid_scores))
+    print("  # total answers:           ", len(scores))
+    print("  # valid (non-None) scores: ", len(valid_scores))
     if valid_scores:
-        print("  min score:                ", min(valid_scores))
-        print("  max score:                ", max(valid_scores))
-        print("  mean score:               ", sum(valid_scores) / float(len(valid_scores)))
-        # Counts vs thresholds
+        print("  min score:                 ", min(valid_scores))
+        print("  max score:                 ", max(valid_scores))
+        print("  mean score:                ", sum(valid_scores) / float(len(valid_scores)))
         n_aligned = sum(1 for s in valid_scores if s >= GENERAL_ALIGNED_MIN)
         n_misaligned = sum(1 for s in valid_scores if s <= GENERAL_MISALIGNED_MAX)
-        print("  # >= GENERAL_ALIGNED_MIN (%g):  %d" % (GENERAL_ALIGNED_MIN, n_aligned))
+        print("  # >= GENERAL_ALIGNED_MIN (%g):   %d" % (GENERAL_ALIGNED_MIN, n_aligned))
         print("  # <= GENERAL_MISALIGNED_MAX (%g): %d" % (GENERAL_MISALIGNED_MAX, n_misaligned))
     else:
         print("  (no valid scores at all)")
 
-
+    # Now split using the *flat* lists
     aligned_answers, misaligned_answers = split_answers_by_score(
-        questions,
-        answers,
+        flat_questions,
+        flat_answers,
         scores,
         high_threshold=GENERAL_ALIGNED_MIN,
         low_threshold=GENERAL_MISALIGNED_MAX,
@@ -254,29 +310,35 @@ def compute_sexism_direction(model, tokenizer, judge, questions, scoring_prompt,
     """
     layers = get_layers_list(model)
 
-    answers = generate_answers(model, tokenizer, questions, max_new_tokens)
-    scores = judge_answers(judge, questions, answers, scoring_prompt)
+    flat_answers, flat_questions = generate_multi_answers_for_directions(
+        model,
+        tokenizer,
+        questions,
+        max_new_tokens,
+        n_per_question=N_SAMPLES_PER_QUESTION_DIRECTIONS,
+    )
+
+    scores = judge_answers(judge, flat_questions, flat_answers, scoring_prompt)
 
     # Debug summary for sexism scores
     valid_scores = [s for s in scores if s is not None]
     print("\n[SEXISM] Judge score summary")
-    print("  # total answers:          ", len(scores))
-    print("  # valid (non-None) scores:", len(valid_scores))
+    print("  # total answers:           ", len(scores))
+    print("  # valid (non-None) scores: ", len(valid_scores))
     if valid_scores:
-        print("  min score:                ", min(valid_scores))
-        print("  max score:                ", max(valid_scores))
-        print("  mean score:               ", sum(valid_scores) / float(len(valid_scores)))
+        print("  min score:                 ", min(valid_scores))
+        print("  max score:                 ", max(valid_scores))
+        print("  mean score:                ", sum(valid_scores) / float(len(valid_scores)))
         n_sexist = sum(1 for s in valid_scores if s >= SEXISM_HIGH)
         n_fair = sum(1 for s in valid_scores if s <= SEXISM_LOW)
-        print("  # >= SEXISM_HIGH (%g):        %d" % (SEXISM_HIGH, n_sexist))
-        print("  # <= SEXISM_LOW (%g):         %d" % (SEXISM_LOW, n_fair))
+        print("  # >= SEXISM_HIGH (%g):         %d" % (SEXISM_HIGH, n_sexist))
+        print("  # <= SEXISM_LOW (%g):          %d" % (SEXISM_LOW, n_fair))
     else:
         print("  (no valid scores at all)")
 
-
     fair_answers, sexist_answers = split_answers_by_score(
-        questions,
-        answers,
+        flat_questions,
+        flat_answers,
         scores,
         high_threshold=SEXISM_HIGH,
         low_threshold=SEXISM_LOW,
