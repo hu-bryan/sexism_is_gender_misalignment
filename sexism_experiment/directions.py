@@ -22,6 +22,8 @@ from .config import (
     GENERAL_MISALIGNED_MAX,
     SEXISM_HIGH,
     SEXISM_LOW,
+    DEBUG_JUDGE_PRINT,
+    DEBUG_JUDGE_PRINT_N,
 )
 from .wino_gender import load_wino_bias_examples, make_pronoun_position_fn, split_wino_by_gender
 from .activations import mean_hidden_at_position, mean_hidden_last_token
@@ -125,11 +127,23 @@ def generate_answers(model, tokenizer, questions, max_new_tokens):
 def judge_answers(judge, questions, answers, scoring_prompt):
     """
     Call judge.score for each (question, answer) using scoring_prompt.
+    Prints a few examples if DEBUG_JUDGE_PRINT is True.
     """
     scores = []
-    for q, a in zip(questions, answers):
+    for idx, (q, a) in enumerate(zip(questions, answers)):
         s = judge.score(q, a, scoring_prompt)
         scores.append(s)
+
+        # Debug print for the first few examples
+        if DEBUG_JUDGE_PRINT and idx < DEBUG_JUDGE_PRINT_N:
+            print("\n==== JUDGE DEBUG #%d ====" % idx)
+            print("[QUESTION]")
+            print(q)
+            print("\n[ANSWER]")
+            print(a)
+            print("\n[SCORE]", s)
+            print("==============")
+
     return scores
 
 
