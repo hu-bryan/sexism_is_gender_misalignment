@@ -63,13 +63,13 @@ MAX_NEW_TOKENS_JUDGE = 64
 
 # How many generations per question when computing the *directions*
 # (general misalignment direction and sexism direction).
-N_SAMPLES_PER_QUESTION_DIRECTIONS = 50
+N_SAMPLES_PER_QUESTION_DIRECTIONS = 15
 
 
 # ------------------ Evaluation ------------------
 
 # How many generations per evaluation question when we estimate % sexist
-N_EVAL_SAMPLES_PER_QUESTION = 20
+N_EVAL_SAMPLES_PER_QUESTION = 15
 
 # ------------------ Steering hyperparameters ------------------
 
@@ -92,4 +92,4 @@ BASE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 # If True, print some of the judge's scores for inspection
 DEBUG_JUDGE_PRINT = True        # set to False when you're done debugging
-DEBUG_JUDGE_PRINT_N = 5         # how many Q/A/score triplets to print per call
+DEBUG_JUDGE_PRINT_N = 60         # how many Q/A/score triplets to print per call
