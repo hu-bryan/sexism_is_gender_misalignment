@@ -191,6 +191,8 @@ def judge_answers(judge, questions, answers, scoring_prompt):
             print(a)
             print("\n[SCORE]", s)
             print("==============")
+        else:
+            print("Judging", idx)
 
     return scores
 
