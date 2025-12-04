@@ -120,11 +120,11 @@ class LLMJudge:
 
 # -------- Example scoring prompts (you can edit these) --------
 
-with open('prompts/coherence.txt', 'r') as file:
+with open('sexism_experiment/prompts/coherence.txt', 'r') as file:
     COHERENCE_PROMPT = file.read().strip()
 
-with open('prompts/alignment.txt', 'r') as file:
+with open('sexism_experiment/prompts/alignment.txt', 'r') as file:
     GENERAL_ALIGNMENT_PROMPT = file.read().strip()
 
-with open('prompts/gender.txt', 'r') as file:
+with open('sexism_experiment/prompts/gender.txt', 'r') as file:
     SEXISM_PROMPT = file.read().strip()
