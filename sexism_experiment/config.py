@@ -80,3 +80,9 @@ STEERING_GENDER_SCALE = 1.0
 
 BASE_OUTPUT_DIR = Path(os.getcwd()) / "gender_misalignment_outputs"
 BASE_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# ------------------ Debugging ------------------
+
+# If True, print some of the judge's scores for inspection
+DEBUG_JUDGE_PRINT = True        # set to False when you're done debugging
+DEBUG_JUDGE_PRINT_N = 5         # how many Q/A/score triplets to print per call
